@@ -1,0 +1,8 @@
+https://economy.roblox.com/v1/purchases/products/{PRODUCT_ID}
+
+{
+    expectedCurrency: number
+    expectedPrice: number
+    expectedSellerId: number
+}
+
