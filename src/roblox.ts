@@ -2,6 +2,8 @@ import axios from "axios";
 
 type AvatarType = "R15" | "R6";
 
+type CreatorType = 'Group' | 'User';
+
 interface Scales {
   height: number;
   width: number;
@@ -36,47 +38,63 @@ interface AvatarInfo {
   defaultPantsApplied: boolean;
 }
 
-interface AssetDetails {
-  id: number;
-  itemType: string;
-  assetType: string;
-  bundleType: string;
-  name: string;
-  description: string;
-  productId: number;
-  genres: string[];
-  bundledItems: {
-    owned: boolean;
-    id: number;
-    name: string;
-    type: string;
-  }[];
-  itemStatus: string[];
-  itemRestrictions: string[];
-  creatorType: "User";
-  creatorTargetId: 0;
-  creatorName: string;
-  price: 0;
-  premiumPricing: {
-    premiumDiscountPercentage: 0;
-    premiumPriceInRobux: 0;
+interface ProductInfo {
+  TargetId: number;
+  ProductType: string;
+  AssetId: number;
+  ProductId: number;
+  Name: string;
+  Description: string;
+  AssetTypeId: number;
+  Creator: {
+    Id: number;
+    Name: string;
+    CreatorType: CreatorType;
+    CreatorTargetId: number;
   };
-  lowestPrice: 0;
-  priceStatus: string;
-  unitsAvailableForConsumption: 0;
-  purchaseCount: 0;
-  favoriteCount: 0;
-  offSaleDeadline: "2021-04-26T01:01:20.028Z";
+  IconImageAssetId: number;
+  Created: string;
+  Updated: string;
+  PriceInRobux: null | number;
+  PriceInTickets: null | number;
+  Sales: number;
+  IsNew: boolean;
+  IsForSale: boolean;
+  IsPublicDomain: boolean;
+  IsLimited: boolean;
+  IsLimitedUnique: boolean;
+  Remaining: null | number;
+  MinimumMembershipLevel: number;
+  ContentRatingTypeId: number;
 }
 
 class Roblox {
-  public csrfToken: string | null;
+  private userId: string = "";
 
   constructor(cookie: string) {
-    this.csrfToken = null;
     axios.defaults.headers.common["Cookie"] = `.ROBLOSECURITY=${cookie}`;
     axios.defaults.headers.common["User-Agent"] = "OutfitMatcher/Axios";
-    axios.interceptors.response.use()
+    axios.interceptors.response.use(
+      (res) => res,
+      (error) => {
+        if (error.response && error.response.status === 403) {
+          axios.defaults.headers.common["x-csrf-token"] =
+            error.response.headers["x-csrf-token"];
+
+          return axios(error.config);
+        } else {
+          return Promise.reject(error);
+        }
+      }
+    );
+  }
+
+  public async init(): Promise<void> {
+    const res = await axios("https://users.roblox.com/v1/users/authenticated");
+
+    this.userId = res.data.id;
+
+    return;
   }
 
   public async getAvatar(userId: number | string): Promise<AvatarInfo> {
@@ -94,33 +112,77 @@ class Roblox {
   }
 
   public async setAvatarType(type: AvatarType): Promise<void> {
-    const res = await axios.post(`https://avatar.roblox.com/v1/avatar/set-player-avatar-type`, {
-      playerAvatarTypeModel: type
-    });
+    const res = await axios.post(
+      `https://avatar.roblox.com/v1/avatar/set-player-avatar-type`,
+      {
+        playerAvatarTypeModel: type,
+      }
+    );
 
-    if(!res.data.success) return Promise.reject(res);
+    if (!res.data.success) return Promise.reject(res);
 
     return;
   }
 
   public async setScales(scales: Scales): Promise<void> {
-    const res = await axios.post(`https://avatar.roblox.com/v1/avatar/set-scales`, {
-      scalesModel: scales
-    });
+    const res = await axios.post(
+      `https://avatar.roblox.com/v1/avatar/set-scales`,
+      {
+        ...scales,
+      }
+    );
 
-    if(!res.data.success) return Promise.reject(res);
+    if (!res.data.success) return Promise.reject(res);
 
     return;
   }
 
   public async setColors(colors: Colors) {
-    const res = await axios.post(`https://avatar.roblox.com/v1/avatar/set-scales`, {
-      bodyColorsModel: colors
-    });
+    const res = await axios.post(
+      `https://avatar.roblox.com/v1/avatar/set-body-colors`,
+      {
+        ...colors,
+      }
+    );
 
-    if(!res.data.success) return Promise.reject(res);
+    if (!res.data.success) return Promise.reject(res);
 
     return;
+  }
+
+  public async setWearingAssets(assetIds: string[] | number[]): Promise<void> {
+    const res = await axios.post(
+      `https://avatar.roblox.com/v1/avatar/set-wearing-assets`,
+      {
+        assetIds,
+      }
+    );
+
+    if (!res.data.success) return Promise.reject(res);
+
+    return;
+  }
+
+  public async userOwnsAsset(
+    assetId: number | string
+  ): Promise<{ assetId: number; owned: boolean }> {
+    const res = await axios(
+      `https://inventory.roblox.com/v1/users/${this.userId}/items/Asset/${assetId}`
+    );
+
+    console.log(assetId);
+
+    // technically type defs are wrong parseInt can accept numbers, it just returns the number passed in lol
+    return {
+      assetId: parseInt(assetId as string),
+      owned: res.data.data.length > 0 ? true : false,
+    };
+  }
+
+  public async getProductInfo(assetId: number | string): Promise<ProductInfo> {
+    const res = await axios(`https://api.roblox.com/marketplace/productinfo?assetId=${assetId}`);
+
+    return res.data;
   }
 }
 
