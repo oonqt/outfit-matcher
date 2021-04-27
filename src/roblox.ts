@@ -38,34 +38,20 @@ interface AvatarInfo {
   defaultPantsApplied: boolean;
 }
 
-interface ProductInfo {
-  TargetId: number;
-  ProductType: string;
-  AssetId: number;
-  ProductId: number;
-  Name: string;
-  Description: string;
-  AssetTypeId: number;
-  Creator: {
-    Id: number;
-    Name: string;
-    CreatorType: CreatorType;
-    CreatorTargetId: number;
-  };
-  IconImageAssetId: number;
-  Created: string;
-  Updated: string;
-  PriceInRobux: null | number;
-  PriceInTickets: null | number;
-  Sales: number;
-  IsNew: boolean;
-  IsForSale: boolean;
-  IsPublicDomain: boolean;
-  IsLimited: boolean;
-  IsLimitedUnique: boolean;
-  Remaining: null | number;
-  MinimumMembershipLevel: number;
-  ContentRatingTypeId: number;
+interface AssetInfo {
+  id: number;
+  itemType: string;
+  assetType: number;
+  name: string;
+  description: string;
+  productId: number;
+  genres: string[];
+  creatorType: CreatorType;
+  itemRestrictions: string[];
+  creatorTargetId: number;
+  creatorName: string;
+  price: number;
+  favoriteCount: number;
 }
 
 class Roblox {
@@ -93,11 +79,9 @@ class Roblox {
     const res = await axios("https://users.roblox.com/v1/users/authenticated");
 
     this.userId = res.data.id;
-
-    return;
   }
 
-  public async getAvatar(userId: number | string): Promise<AvatarInfo> {
+  public async getAvatar(userId: number): Promise<AvatarInfo> {
     const res = await axios(
       `https://avatar.roblox.com/v1/users/${userId}/avatar`
     );
@@ -120,8 +104,6 @@ class Roblox {
     );
 
     if (!res.data.success) return Promise.reject(res);
-
-    return;
   }
 
   public async setScales(scales: Scales): Promise<void> {
@@ -133,8 +115,6 @@ class Roblox {
     );
 
     if (!res.data.success) return Promise.reject(res);
-
-    return;
   }
 
   public async setColors(colors: Colors) {
@@ -146,11 +126,9 @@ class Roblox {
     );
 
     if (!res.data.success) return Promise.reject(res);
-
-    return;
   }
 
-  public async setWearingAssets(assetIds: string[] | number[]): Promise<void> {
+  public async setWearingAssets(assetIds: number[]): Promise<void> {
     const res = await axios.post(
       `https://avatar.roblox.com/v1/avatar/set-wearing-assets`,
       {
@@ -159,30 +137,42 @@ class Roblox {
     );
 
     if (!res.data.success) return Promise.reject(res);
-
-    return;
   }
 
   public async userOwnsAsset(
-    assetId: number | string
+    assetId: number
   ): Promise<{ assetId: number; owned: boolean }> {
     const res = await axios(
       `https://inventory.roblox.com/v1/users/${this.userId}/items/Asset/${assetId}`
     );
 
-    console.log(assetId);
-
     // technically type defs are wrong parseInt can accept numbers, it just returns the number passed in lol
     return {
-      assetId: parseInt(assetId as string),
+      assetId,
       owned: res.data.data.length > 0 ? true : false,
     };
   }
 
-  public async getProductInfo(assetId: number | string): Promise<ProductInfo> {
-    const res = await axios(`https://api.roblox.com/marketplace/productinfo?assetId=${assetId}`);
+  public async getAssetInfo(assetIds: number[]): Promise<AssetInfo[]> {
+    const res = await axios.post('https://catalog.roblox.com/v1/catalog/items/details', {
+      items: assetIds.map(asset => ({ id: asset, itemType: 'Asset' }))
+    });
 
-    return res.data;
+    return res.data.data;
+  }
+
+  public async getBalance(): Promise<number> {
+    const res = await axios('https://api.roblox.com/currency/balance');
+
+    return res.data.robux;
+  }
+
+  public async purchaseProduct(productId: number, sellerId: number, price: number): Promise<void> {
+    await axios.post(`https://economy.roblox.com/v1/purchases/products/${productId}`, {
+      expectedCurrency: 1,
+      expectedPrice: price,
+      expectedSellerId: sellerId
+    });
   }
 }
 
